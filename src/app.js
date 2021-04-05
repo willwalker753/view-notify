@@ -5,6 +5,16 @@ const cors = require('cors')
 const helmet = require('helmet')
 const nodemailer = require('nodemailer')
 const { NODE_ENV } = require('./config')
+const { Pool } = require('pg');
+
+const pool = new Pool({  
+    user: process.env.DB_USER,
+    host: process.env.DB_HOST,
+    database: process.env.DB_DB,
+    password: process.env.DB_PASSWORD,
+    port: process.env.DB_PORT,
+    ssl: { rejectUnauthorized: false }
+})
 
 const app = express()
 
@@ -20,7 +30,7 @@ app.use(express.urlencoded({
     extended: true
 }));
 
-app.post('/email', (req, res) => { 
+app.post('/email', async(req, res) => { 
     let transporter = nodemailer.createTransport({
         service: 'gmail',
         auth: {
@@ -32,7 +42,7 @@ app.post('/email', (req, res) => {
         from: process.env.EMAIL,
         to: process.env.RECEIVER,
         subject: req.body.name+' received a view',
-        text: 'it worked',
+        text: req.body.name+' got viewed by some random person out there finally.',
     }
     transporter.sendMail(mailOptions, function(err, data){
         if(err) {
@@ -41,6 +51,25 @@ app.post('/email', (req, res) => {
             console.log('Email sent!')
         }
     })
+    try {
+        let options = {
+            timeZone: 'America/Chicago',
+            year: 'numeric',
+            month: 'numeric',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: 'numeric',
+            second: 'numeric',
+          },
+          formatter = new Intl.DateTimeFormat([], options);
+        let date = formatter.format(new Date());
+        let sql = 'INSERT INTO Portfolio(ts) VALUES($1) RETURNING *';
+        let params = [ date ];
+        await pool.query(sql, params);
+    }
+    catch(err) {
+        console.log(err)
+    }
     res.status(200).send();
 })
 
